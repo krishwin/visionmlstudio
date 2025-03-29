@@ -6,10 +6,7 @@ from typing import Any, Dict
 import numpy as np
 import json
 import random
-from inferencepytorch.inference import TransNetV2Engine
-from dotenv import load_dotenv
-
-load_dotenv()
+from models.TransNetV2.inference import TransNetV2Engine
 
 ray.init(ignore_reinit_error=True)
 

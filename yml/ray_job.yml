@@ -33,7 +33,7 @@ spec:
 
     env_vars:
       counter_name: "test_counter"
-    working_dir: "https://github.com/krishnawin/TransNetV2/archive/refs/heads/master.zip"
+    working_dir: "https://github.com/krishnawin/visionmlstudio/archive/refs/heads/master.zip"
     
 
   # Suspend specifies whether the RayJob controller should create a RayCluster instance.
@@ -174,24 +174,24 @@ spec:
                         key: PG_PORT
                   - name: access_key
                     valueFrom:
-                    secretKeyRef:
-                      name: s3
-                      key: access_key
+                      secretKeyRef:
+                        name: s3
+                        key: access_key
                   - name: secret_key
                     valueFrom:
-                    secretKeyRef:
-                      name: s3
-                      key: secret_key
+                      secretKeyRef:
+                        name: s3
+                        key: secret_key
                   - name: namespace
                     valueFrom:
-                    secretKeyRef:
-                      name: s3
-                      key: namespace
+                      secretKeyRef:
+                        name: s3
+                        key: namespace
                   - name: region
                     valueFrom:
-                    secretKeyRef:
-                      name: s3
-                      key: region
+                      secretKeyRef:
+                        name: s3
+                        key: region
             volumes:
               - name: yt-config
                 secret:
