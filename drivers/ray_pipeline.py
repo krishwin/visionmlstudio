@@ -42,7 +42,16 @@ def get_files():
     data = [file.path for file in files_info]
     return data
 
-
+def get_weights():
+    selector  = fs.FileSelector('weights/TransNetV2/',recursive=True)
+    local_path = "../" + os.path.basename(selector.base_dir)
+    os.makedirs(local_path, exist_ok=True)
+    for file_info in s3fs.get_file_info(selector):
+        if file_info.type == fs.FileType.File:
+            local_file_path = os.path.join(local_path, os.path.basename(file_info.path))
+            with s3fs.open_input_file(file_info.path) as s3file, open(local_file_path, 'wb') as localfile:
+                localfile.write(s3file.read())
+get_weights()
 files = get_files()#['yt-vtt/vtt/TeA8S4A8kos.mkv']#
 for file in files:
     task_data={"data": {"video": ""}, "annotations": [{"result": []}]}
