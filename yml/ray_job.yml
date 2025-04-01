@@ -28,8 +28,8 @@ spec:
       - oci
       - pandas
       - numpy
-      - json
       - pyarrow
+      - torchvision
 
     env_vars:
       counter_name: "test_counter"
