@@ -4,6 +4,7 @@ import torch
 from .transnetv2_pytorch import TransNetV2
 from typing import Dict
 from torchvision import transforms
+from utils.s3utils import download_file_from_s3
 
 class TransNetV2Engine:
 
@@ -11,6 +12,8 @@ class TransNetV2Engine:
         if model_dir is None:
             model_dir = os.path.join(os.path.dirname(__file__), "")
             print(model_dir )
+            download_file_from_s3("weights", "TransNetV2/transnetv2-pytorch-weights.pth", model_dir + "transnetv2-pytorch-weights.pth")
+
             if not os.path.isdir(model_dir):
                 raise FileNotFoundError(f"[TransNetV2] ERROR: {model_dir} is not a directory.")
             else:
