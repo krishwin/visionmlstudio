@@ -1,0 +1,126 @@
+import asyncio
+import logging
+from dotenv import load_dotenv
+from livekit import rtc
+from livekit.agents import (AutoSubscribe, JobContext, WorkerOptions, cli,Agent,AgentSession,JobProcess,
+    RoomInputOptions,
+    RoomOutputOptions,
+    RunContext,metrics)
+from PIL import Image
+import numpy as np
+from livekit.agents.voice import MetricsCollectedEvent
+from livekit.plugins import google
+from collections import deque
+import os 
+import sys
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
+load_dotenv()
+
+logger = logging.getLogger("my-worker")
+logger.setLevel(logging.INFO)
+
+WIDTH = 640
+HEIGHT = 480
+
+# Per-client state
+class ClientSession:
+    def __init__(self):
+        self.short_buffer = deque(maxlen=32)
+        self.long_buffer = deque(maxlen=96)
+        self.counter = 0
+
+    def add_frame(self, frame):
+        self.short_buffer.append(frame)
+        self.long_buffer.append(frame)
+        self.counter += 1
+
+class MyAgent(Agent):
+    def __init__(self) -> None:
+        super().__init__(
+            instructions="you are personal fitness coach,  You will also provide encouragement and motivation.politely ask the user to switch on their camera so that you can watch their workout. You can identify the type of workout, count reps, and provide motivation.",
+        )
+
+    async def on_enter(self):
+        # when the agent is added to the session, it'll generate a reply
+        # according to its instructions
+        
+        self.session.generate_reply(instructions ="Hello, I am your personal fitness coach. switch on your camera so that i can watch your workour . i can identify your workout,count reps and provide motivation?")
+ 
+class VideoProcessing():
+    
+    def __init__(self):
+        from models.RepNet import RepCounterClass
+        from models.timesformer import ActionDetectorClass
+        print("Initializing VideoProcessing")
+        self.rep_model = RepCounterClass()
+        self.action_model = ActionDetectorClass()
+        self.session = ClientSession()
+        print("VideoProcessing initialized")
+    async def action_detection(self, frames: np.ndarray):
+        return await self.action_model(frames)
+
+    async def rep_counting(self, frames: np.ndarray):
+        return await self.rep_model(frames)    
+    async def do_something(self,track: rtc.RemoteVideoTrack, agentsession: AgentSession):
+        video_stream = rtc.VideoStream(track)
+        
+        async for event in video_stream:
+            # Do something here to process event.frame
+            print(f"Received frame with timestamp {event.timestamp_us} and type {event.frame.type}")
+            frame=event.frame.convert( rtc.VideoBufferType.RGBA)
+            print(f"Frame format: {frame.type}, width: {frame.width}, height: {frame.height}")
+            arr = np.asarray(frame.data, dtype=np.uint8)
+            print(f"Array shape: {arr.shape}, dtype: {arr.dtype}")
+            arr=arr.reshape((frame.height, frame.width, 4))
+            self.session.add_frame(arr)
+            result = {}
+            if len(self.session.short_buffer) == 32 and self.session.counter % 32 == 0:
+                        result =   await asyncio.to_thread(self.action_model(np.stack(self.session.short_buffer)))
+                        print(f"Action detection result: {result}")
+            if len(self.session.long_buffer) == 96 and self.session.counter % 32 == 0:
+                        result['count'] =  await  asyncio.to_thread(self.rep_model(np.stack(self.session.long_buffer)))
+            if result:
+                print(f"Result: {result}")
+                if 'action' in result:
+                     asyncio.create_task(agentsession.generate_reply(instructions =f"workout: {result['action']}"))
+                if 'count' in result:
+                     asyncio.create_task(agentsession.generate_reply(instructions =f"Rep count: {result['count']}"))
+        await video_stream.aclose()
+def prewarm_fnc(proc: JobProcess):
+    # Prewarm function to initialize the video processing model
+    print("Prewarming video processing model")
+    VideoProcessing()
+async def entrypoint(ctx: JobContext):
+    # an rtc.Room instance from the LiveKit Python SDK
+    room = ctx.room
+    logger.info(f"Connecting to room")
+    
+    # connect to room
+    await ctx.connect(auto_subscribe=AutoSubscribe.VIDEO_ONLY)
+    session = AgentSession(
+        # any combination of STT, LLM, TTS, or realtime API can be used
+        llm=google.LLM(),
+        tts=google.TTS(),
+        # use LiveKit's turn detection model
+    )
+    await session.start(
+        agent=MyAgent(),
+        room=ctx.room,
+        room_input_options=RoomInputOptions(
+            # uncomment to enable Krisp BVC noise cancellation
+            # noise_cancellation=noise_cancellation.BVC(),
+        ),
+        room_output_options=RoomOutputOptions(transcription_enabled=True),
+    )
+    # set up listeners on the room before connecting
+    @room.on("track_subscribed")
+    def on_track_subscribed(track: rtc.Track, *_):
+        if track.kind == rtc.TrackKind.KIND_VIDEO:
+            videoprocessor = VideoProcessing()
+            asyncio.create_task(videoprocessor.do_something(track,session))
+
+        
+if __name__ == "__main__":
+    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint,prewarm_fnc=prewarm_fnc))

@@ -1,0 +1,17 @@
+./notebooks/data/
+./.conda
+./.vscode/
+./.ipynb_checkpoints/
+./.devcontainer/
+./.git/
+./.gitignore
+./.dockerignore
+./models/RepNet/data/
+**/__pycache__
+notebooks/data
+./.vscode/settings.json
+models/RepNet/data/
+.devcontainer/kaggle.json
+.DS_Store
+.env
+notebooks/keys/gcp_sa.json

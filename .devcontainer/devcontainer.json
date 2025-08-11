@@ -1,0 +1,8 @@
+{
+    "name": "My Project with Custom PyTorch",
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "forwardPorts": [8888],
+  }
+  
